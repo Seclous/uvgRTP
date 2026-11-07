@@ -40,6 +40,10 @@ target_include_directories(${PROJECT_NAME}_version
         ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
+if (UVGRTP_BUILD_SHARED)
+    target_compile_definitions(${PROJECT_NAME}_version PRIVATE uvgrtp_EXPORTS)
+endif()
+
 if (UVGRTP_RELEASE_COMMIT)
     target_compile_definitions(${PROJECT_NAME}_version PRIVATE RTP_RELEASE_COMMIT)
 endif()

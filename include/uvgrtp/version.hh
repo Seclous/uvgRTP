@@ -38,14 +38,14 @@ namespace uvgrtp {
      *
      * \return Pointer to a null-terminated version string (lifetime: static)
      */
-    const char* UVGRTP_EXPORT get_version_cstr();
+    UVGRTP_EXPORT const char* get_version_cstr();
 
     /**
      * \brief Get the Git commit hash of the uvgRTP build as a C string
      *
      * \return Pointer to a null-terminated git-hash string (lifetime: static)
      */
-    const char* UVGRTP_EXPORT get_git_hash_cstr();
+    UVGRTP_EXPORT const char* get_git_hash_cstr();
 
     /** @} */
 
