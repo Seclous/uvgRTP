@@ -1,5 +1,7 @@
 #include "uvgrtp/session.hh"
 
+#include <algorithm>
+
 #include "uvgrtp/media_stream.hh"
 
 #include "media_stream_internal.hh"
