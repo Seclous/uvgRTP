@@ -62,6 +62,17 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 set(UVGRTP_CXX_FLAGS "")
 set(UVGRTP_LINKER_FLAGS "")
 
+# Package managers may provide Crypto++ through a CMake config package instead
+# of pkg-config. Keep the existing discovery paths when no such target exists.
+set(UVGRTP_CRYPTOPP_CONFIG OFF)
+if (NOT UVGRTP_DISABLE_CRYPTO)
+    find_package(cryptopp QUIET CONFIG)
+    if (TARGET cryptopp::cryptopp)
+        target_link_libraries(${PROJECT_NAME} PRIVATE cryptopp::cryptopp)
+        set(UVGRTP_CRYPTOPP_CONFIG ON)
+    endif()
+endif()
+
 # uvgRTP shared version header generation
 include(cmake/ExportHeaders.cmake)
 include(cmake/Definitions.cmake)
@@ -279,23 +290,28 @@ if (UNIX)
             endif()
         endif()
 
-        # Generate and install .pc file
-        string(REPLACE ";" " " UVGRTP_CXX_FLAGS "${UVGRTP_CXX_FLAGS}")
-        string(REPLACE ";" " " UVGRTP_LINKER_FLAGS "${UVGRTP_LINKER_FLAGS}")
-        configure_file("cmake/uvgrtp.pc.in" "uvgrtp.pc" @ONLY)
-        if (NOT UVGRTP_DISABLE_INSTALL)
-            install(FILES ${CMAKE_CURRENT_BINARY_DIR}/uvgrtp.pc DESTINATION ${PKG_CONFIG_PATH}/)
+        # A CMake target alone cannot supply Crypto++'s pkg-config link flags.
+        if (NOT UVGRTP_CRYPTOPP_CONFIG OR CRYPTOPP_FOUND)
+            # Generate and install .pc file
+            string(REPLACE ";" " " UVGRTP_CXX_FLAGS "${UVGRTP_CXX_FLAGS}")
+            string(REPLACE ";" " " UVGRTP_LINKER_FLAGS "${UVGRTP_LINKER_FLAGS}")
+            configure_file("cmake/uvgrtp.pc.in" "uvgrtp.pc" @ONLY)
+            if (NOT UVGRTP_DISABLE_INSTALL)
+                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/uvgrtp.pc DESTINATION ${PKG_CONFIG_PATH}/)
+            endif()
+        else()
+            message(STATUS "Crypto++ has no pkg-config metadata. Not generating pc file")
         endif()
     else()
         message("pkg-config not found. Not generating pc file")
     endif(PkgConfig_FOUND)
 endif (UNIX)
 
-if (NOT CRYPTOPP_FOUND AND UVGRTP_DOWNLOAD_CRYPTO)
+if (NOT UVGRTP_CRYPTOPP_CONFIG AND NOT CRYPTOPP_FOUND AND UVGRTP_DOWNLOAD_CRYPTO)
   include(cmake/CryptoHeaders.cmake)
   list(APPEND UVGRTP_CXX_FLAGS ${CRYPTOPP_CFLAGS_OTHER})
   list(APPEND UVGRTP_LINKER_FLAGS ${CRYPTOPP_LDFLAGS})
-elseif(NOT CRYPTOPP_FOUND AND UNIX)
+elseif(NOT UVGRTP_CRYPTOPP_CONFIG AND NOT CRYPTOPP_FOUND AND UNIX)
   # In Visual Studio, we want to leave user the option to add Crypto++ headers manually
   message("libcrypto++ not found. Encryption will be disabled")
   list(APPEND UVGRTP_CXX_FLAGS "-D__RTP_NO_CRYPTO__")
@@ -347,10 +363,10 @@ if (NOT UVGRTP_DISABLE_INSTALL)
             NAMESPACE ${PROJECT_NAME}::
             )
 
-    #Copy "cmake/uvgrtpConfig.cmake" to "${CMAKE_CURRENT_BINARY_DIR}/uvgrtp/uvgrtpConfig.cmake"
+    #Configure the dependencies needed by the exported targets.
     configure_file(cmake/${PROJECT_NAME}Config.cmake
             "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/${PROJECT_NAME}Config.cmake"
-            COPYONLY
+            @ONLY
             )
 
     #Copy "cmake/uvgrtpMacros.cmake" to "${CMAKE_CURRENT_BINARY_DIR}/uvgrtp/uvgrtpMacros.cmake"
@@ -369,7 +385,8 @@ if (NOT UVGRTP_DISABLE_INSTALL)
             DESTINATION ${ConfigPackageLocation}
             )
 
-    install(FILES cmake/${PROJECT_NAME}Config.cmake cmake/${PROJECT_NAME}Macros.cmake
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/${PROJECT_NAME}Config.cmake"
+            cmake/${PROJECT_NAME}Macros.cmake
             "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/${PROJECT_NAME}ConfigVersion.cmake"
             DESTINATION ${ConfigPackageLocation}
             COMPONENT uvgRTPMain
